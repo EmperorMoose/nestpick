@@ -6,14 +6,14 @@ RUN npm ci
 COPY frontend/ .
 RUN npm run build
 
-# Stage 2: Python runtime
-FROM python:3.11-slim
+# Stage 2: Python runtime — official Playwright image has Chromium + all deps pre-installed
+FROM mcr.microsoft.com/playwright/python:v1.49.1-jammy
 WORKDIR /app
 
-# Install Python deps first (better layer caching)
+# Install Python deps (playwright already installed in base image, so skip re-installing it)
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt \
-    && playwright install chromium --with-deps
+RUN grep -v "playwright" requirements.txt \
+    | pip install --no-cache-dir -r /dev/stdin
 
 # Copy backend source
 COPY backend/ .
