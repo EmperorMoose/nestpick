@@ -69,10 +69,19 @@ def extract_address_from_url(url: str) -> tuple[str, str | None]:
     return address, zpid
 
 
+_STREET_SUFFIXES = {
+    "LN", "DR", "ST", "RD", "AVE", "BLVD", "CT", "WAY", "PL",
+    "CIR", "PKWY", "TRL", "TER", "LOOP", "HWY", "SQ",
+    "LANE", "DRIVE", "STREET", "ROAD", "AVENUE", "BOULEVARD",
+    "COURT", "PLACE", "CIRCLE", "TRAIL", "TERRACE",
+}
+
+
 def parse_street_from_url(url: str) -> tuple[str, str]:
     """
     Extract street_number and street_name from Zillow URL for POLARIS lookup.
-    Returns (street_number, street_name_fragment).
+    Stops after the street-type suffix so city/state are not included.
+    e.g. "425-Kelford-Ln-Charlotte-NC-28270" → ("425", "Kelford Ln")
     """
     slug_match = re.search(r"/homedetails/([^/]+)/", url)
     if not slug_match:
@@ -81,18 +90,16 @@ def parse_street_from_url(url: str) -> tuple[str, str]:
     if not parts:
         return "", ""
     street_number = parts[0]
-    # Take next 2-3 parts as street name (skip unit numbers and city/state/zip at end)
-    # Heuristic: parts after number until we hit a known city pattern or 2-char state abbrev
     name_parts = []
     for p in parts[1:]:
-        if len(p) == 2 and p.isupper():  # state abbreviation
+        if len(p) == 2 and p.isupper():  # state abbreviation → stop
             break
-        if p.isdigit() and len(p) == 5:  # zip code
+        if p.isdigit() and len(p) == 5:  # zip code → stop
             break
         name_parts.append(p)
-    # Take first 3 words of street name (number + "Little Rock Rd" → "LITTLE ROCK")
-    street_name = " ".join(name_parts[:3])
-    return street_number, street_name
+        if p.upper() in _STREET_SUFFIXES:  # stop after street type (Ln, Dr, Rd …)
+            break
+    return street_number, " ".join(name_parts)
 
 
 async def scrape_httpx(url: str) -> dict[str, Any]:
