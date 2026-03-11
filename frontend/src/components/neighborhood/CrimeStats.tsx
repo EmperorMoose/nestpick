@@ -1,6 +1,5 @@
 import { useCrime } from "@/hooks/useNeighborhood";
 import { type NeighborhoodData } from "@/types";
-import { ShieldAlert, ShieldCheck } from "lucide-react";
 
 interface Props {
   propertyId: number;

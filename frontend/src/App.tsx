@@ -1,5 +1,5 @@
 import { Routes, Route, NavLink } from "react-router-dom";
-import { Home, GitCompareArrows, Map } from "lucide-react";
+import { Home, GitCompareArrows } from "lucide-react";
 import { cn } from "@/lib/utils";
 import DashboardPage from "@/pages/DashboardPage";
 import PropertyPage from "@/pages/PropertyPage";

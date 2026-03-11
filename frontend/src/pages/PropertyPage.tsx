@@ -3,7 +3,7 @@ import { useProperty } from "@/hooks/useProperties";
 import NeighborhoodDashboard from "@/components/neighborhood/NeighborhoodDashboard";
 import PriceHistoryChart from "@/components/property/PriceHistoryChart";
 import MortgageTable from "@/components/property/MortgageTable";
-import { fmt$, fmtNum, fmtDate, fmtStatus, fmtPropertyType } from "@/lib/utils";
+import { fmt$, fmtNum, fmtStatus, fmtPropertyType } from "@/lib/utils";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
