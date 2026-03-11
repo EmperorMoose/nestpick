@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.census.gov)",
+      "WebFetch(domain:data.charlottenc.gov)",
+      "WebFetch(domain:gis.mecknc.gov)",
+      "WebFetch(domain:polaris3g.mecklenburgcountync.gov)",
+      "WebFetch(domain:hazards.fema.gov)"
+    ]
+  }
+}
