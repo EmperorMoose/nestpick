@@ -24,3 +24,23 @@ export function useDeleteProperty() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["properties"] }),
   });
 }
+
+export function useToggleTopOption() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => propertiesApi.toggleTop(id),
+    // Optimistic update so the card flips instantly
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: ["properties"] });
+      const prev = qc.getQueryData<import("@/types").Property[]>(["properties"]);
+      qc.setQueryData<import("@/types").Property[]>(["properties"], (old) =>
+        old?.map((p) => (p.id === id ? { ...p, is_top_option: !p.is_top_option } : p))
+      );
+      return { prev };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(["properties"], ctx.prev);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["properties"] }),
+  });
+}

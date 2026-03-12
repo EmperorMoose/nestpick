@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # On Railway a persistent volume is mounted at /data.
+# Detect Railway via the RAILWAY_ENVIRONMENT env var (set automatically by Railway).
 # Locally, store the DB next to this file (backend/house_dashboard.db).
-_data_dir = Path("/data") if Path("/data").exists() else Path(__file__).parent
+_on_railway = os.environ.get("RAILWAY_ENVIRONMENT") is not None
+_data_dir = Path("/data") if _on_railway else Path(__file__).parent
 _default_db_url = f"sqlite+aiosqlite:///{_data_dir}/house_dashboard.db"
 
 

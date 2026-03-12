@@ -103,6 +103,7 @@ class PropertyListItem(BaseModel):
     address: str
     city: str | None
     list_price: int | None
+    offer_price: int | None = None
     bedrooms: int | None
     bathrooms: float | None
     living_area: int | None
@@ -111,6 +112,8 @@ class PropertyListItem(BaseModel):
     photos_json: str | None
     data_source: str | None
     updated_at: datetime
+    is_top_option: bool = False
+    avg_rating: float | None = None
 
     model_config = {"from_attributes": True}
 

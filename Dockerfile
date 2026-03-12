@@ -15,6 +15,11 @@ COPY backend/requirements.txt .
 RUN grep -v "playwright" requirements.txt \
     | pip install --no-cache-dir -r /dev/stdin
 
+# Create the /data directory for the Railway persistent volume mount point.
+# Railway will overlay the real volume here at runtime; this just ensures the
+# path exists if the container ever runs without a volume attached.
+RUN mkdir -p /data
+
 # Copy backend source
 COPY backend/ .
 

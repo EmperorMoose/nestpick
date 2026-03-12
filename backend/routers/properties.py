@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import PriceHistory, Property, PropertySchool, School, TaxHistory
+from models import PriceHistory, Property, PropertyRating, PropertySchool, School, TaxHistory
 from schemas.property_schema import (
     PropertyCreate,
     PropertyListItem,
@@ -51,10 +51,46 @@ def _build_response(prop: Property) -> dict:
     return data
 
 
+_RATING_CATS = ["layout", "aesthetics", "upkeep", "yard", "area", "neighborhood", "overall"]
+
+
 @router.get("", response_model=list[PropertyListItem])
 async def list_properties(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Property).order_by(Property.created_at.desc()))
-    return result.scalars().all()
+    result = await db.execute(
+        select(Property)
+        .options(selectinload(Property.ratings))
+        # Top options first, then newest
+        .order_by(Property.is_top_option.desc(), Property.created_at.desc())
+    )
+    props = result.scalars().all()
+
+    items = []
+    for p in props:
+        all_vals = [
+            getattr(r, cat)
+            for r in p.ratings
+            for cat in _RATING_CATS
+            if getattr(r, cat) is not None
+        ]
+        avg = round(sum(all_vals) / len(all_vals), 1) if all_vals else None
+        items.append({
+            "id": p.id,
+            "address": p.address,
+            "city": p.city,
+            "list_price": p.list_price,
+            "offer_price": p.offer_price,
+            "bedrooms": p.bedrooms,
+            "bathrooms": p.bathrooms,
+            "living_area": p.living_area,
+            "year_built": p.year_built,
+            "home_status": p.home_status,
+            "photos_json": p.photos_json,
+            "data_source": p.data_source,
+            "updated_at": p.updated_at,
+            "is_top_option": p.is_top_option,
+            "avg_rating": avg,
+        })
+    return items
 
 
 @router.get("/{property_id}", response_model=dict)
@@ -261,6 +297,18 @@ async def update_property(property_id: int, body: PropertyUpdate, db: AsyncSessi
         setattr(prop, field, value)
     await db.commit()
     return {"id": prop.id}
+
+
+@router.patch("/{property_id}/top", response_model=dict)
+async def toggle_top_option(property_id: int, db: AsyncSession = Depends(get_db)):
+    """Toggle the is_top_option flag for a property."""
+    result = await db.execute(select(Property).where(Property.id == property_id))
+    prop = result.scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+    prop.is_top_option = not prop.is_top_option
+    await db.commit()
+    return {"id": prop.id, "is_top_option": prop.is_top_option}
 
 
 @router.patch("/{property_id}/offer", response_model=dict)

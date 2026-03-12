@@ -61,6 +61,9 @@ class Property(Base):
     building_value: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     annual_tax: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
+    # User flags
+    is_top_option: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="0")
+
     # Content
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     photos_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

@@ -38,6 +38,8 @@ export interface Property {
   parcel_id: string | null;
   list_price: number | null;
   offer_price: number | null;
+  is_top_option: boolean;
+  avg_rating: number | null;
   zestimate: number | null;
   rent_zestimate: number | null;
   price_per_sqft: number | null;
