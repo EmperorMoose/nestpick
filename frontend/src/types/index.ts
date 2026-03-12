@@ -37,6 +37,7 @@ export interface Property {
   mls_number: string | null;
   parcel_id: string | null;
   list_price: number | null;
+  offer_price: number | null;
   zestimate: number | null;
   rent_zestimate: number | null;
   price_per_sqft: number | null;

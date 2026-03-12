@@ -180,6 +180,8 @@ async def get_comparison_matrix(comparison_id: int, db: AsyncSession = Depends(g
         # --- Listing ---
         row("List Price",      lambda p: _fmt(p.list_price, "$"),
                                lambda p: float(p.list_price) if p.list_price else None),
+        row("Offer Price",     lambda p: _fmt(p.offer_price, "$") if p.offer_price else "—",
+                               lambda p: float(p.offer_price) if p.offer_price else None),
         row("Zestimate",       lambda p: _fmt(p.zestimate, "$"),
                                lambda p: float(p.zestimate) if p.zestimate else None),
         row("Price/sqft",      lambda p: _fmt(p.price_per_sqft, "$", "/sqft", 0),
@@ -227,19 +229,19 @@ async def get_comparison_matrix(comparison_id: int, db: AsyncSession = Depends(g
         nd_row("Poverty Rate",       lambda nd: f"{nd.pct_poverty:.1f}%" if nd and nd.pct_poverty is not None else "—",
                                      lambda nd: float(nd.pct_poverty) if nd and nd.pct_poverty is not None else None),
         nd_row("Flood Zone",         _fmt_flood_zone),  # categorical — no delta
-        # --- Monthly Payments (20% dn, 30yr fixed) ---
-        row("Pmt @ 5.5% — list",  lambda p: _calc_pmt(p.list_price, 5.5),
-                                   lambda p: _calc_pmt_raw(p.list_price, 5.5)),
-        row("Pmt @ 6.0% — list",  lambda p: _calc_pmt(p.list_price, 6.0),
-                                   lambda p: _calc_pmt_raw(p.list_price, 6.0)),
-        row("Pmt @ 6.5% — list",  lambda p: _calc_pmt(p.list_price, 6.5),
-                                   lambda p: _calc_pmt_raw(p.list_price, 6.5)),
-        row("Pmt @ 5.5% — −10%", lambda p: _calc_pmt(p.list_price, 5.5, 0.9),
-                                   lambda p: _calc_pmt_raw(p.list_price, 5.5, 0.9)),
-        row("Pmt @ 6.0% — −10%", lambda p: _calc_pmt(p.list_price, 6.0, 0.9),
-                                   lambda p: _calc_pmt_raw(p.list_price, 6.0, 0.9)),
-        row("Pmt @ 6.5% — −10%", lambda p: _calc_pmt(p.list_price, 6.5, 0.9),
-                                   lambda p: _calc_pmt_raw(p.list_price, 6.5, 0.9)),
+        # --- Monthly Payments (20% dn, 30yr fixed; uses offer_price when set, else list_price) ---
+        row("Pmt @ 5.5%",      lambda p: _calc_pmt(p.offer_price or p.list_price, 5.5),
+                               lambda p: _calc_pmt_raw(p.offer_price or p.list_price, 5.5)),
+        row("Pmt @ 6.0%",      lambda p: _calc_pmt(p.offer_price or p.list_price, 6.0),
+                               lambda p: _calc_pmt_raw(p.offer_price or p.list_price, 6.0)),
+        row("Pmt @ 6.5%",      lambda p: _calc_pmt(p.offer_price or p.list_price, 6.5),
+                               lambda p: _calc_pmt_raw(p.offer_price or p.list_price, 6.5)),
+        row("Pmt @ 5.5% −10%", lambda p: _calc_pmt(p.offer_price or p.list_price, 5.5, 0.9),
+                               lambda p: _calc_pmt_raw(p.offer_price or p.list_price, 5.5, 0.9)),
+        row("Pmt @ 6.0% −10%", lambda p: _calc_pmt(p.offer_price or p.list_price, 6.0, 0.9),
+                               lambda p: _calc_pmt_raw(p.offer_price or p.list_price, 6.0, 0.9)),
+        row("Pmt @ 6.5% −10%", lambda p: _calc_pmt(p.offer_price or p.list_price, 6.5, 0.9),
+                               lambda p: _calc_pmt_raw(p.offer_price or p.list_price, 6.5, 0.9)),
     ]
 
     return ComparisonMatrix(

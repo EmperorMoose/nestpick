@@ -1,5 +1,8 @@
 import { useParams, Link } from "react-router-dom";
+import { useState } from "react";
 import { useProperty } from "@/hooks/useProperties";
+import { useQueryClient } from "@tanstack/react-query";
+import { propertiesApi } from "@/lib/api";
 import NeighborhoodDashboard from "@/components/neighborhood/NeighborhoodDashboard";
 import PriceHistoryChart from "@/components/property/PriceHistoryChart";
 import MortgageTable from "@/components/property/MortgageTable";
@@ -28,6 +31,39 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 export default function PropertyPage() {
   const { id } = useParams<{ id: string }>();
   const { data: p, isLoading } = useProperty(Number(id));
+  const qc = useQueryClient();
+
+  // Offer price input state — initialised from saved value once property loads
+  const [offerInput, setOfferInput] = useState<string>("");
+  const [offerSaving, setOfferSaving] = useState(false);
+
+  // Sync input when property first loads (or changes)
+  const savedOffer = p?.offer_price;
+
+  async function saveOffer() {
+    if (!p) return;
+    const parsed = offerInput.trim() ? parseInt(offerInput.replace(/,/g, ""), 10) : null;
+    if (parsed !== null && (isNaN(parsed) || parsed <= 0)) return;
+    setOfferSaving(true);
+    try {
+      await propertiesApi.setOffer(p.id, parsed);
+      // Invalidate so the property (and comparison matrix) reflect new offer_price
+      qc.invalidateQueries({ queryKey: ["property", p.id] });
+      qc.invalidateQueries({ queryKey: ["comparison-matrix"] });
+    } finally {
+      setOfferSaving(false);
+    }
+  }
+
+  function clearOffer() {
+    setOfferInput("");
+    if (p) {
+      propertiesApi.setOffer(p.id, null).then(() => {
+        qc.invalidateQueries({ queryKey: ["property", p.id] });
+        qc.invalidateQueries({ queryKey: ["comparison-matrix"] });
+      });
+    }
+  }
 
   if (isLoading) return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
   if (!p) return <p className="text-gray-500">Property not found.</p>;
@@ -94,7 +130,44 @@ export default function PropertyPage() {
 
           {p.list_price && (
             <Section title="Monthly Payments">
-              <MortgageTable listPrice={p.list_price} />
+              {/* Offer price input */}
+              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
+                <span className="text-xs text-gray-500 shrink-0">Offer price:</span>
+                <div className="relative flex-1 max-w-[180px]">
+                  <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder={p.list_price.toLocaleString()}
+                    value={offerInput || (savedOffer ? savedOffer.toLocaleString() : "")}
+                    onChange={(e) => setOfferInput(e.target.value.replace(/[^0-9,]/g, ""))}
+                    onKeyDown={(e) => e.key === "Enter" && saveOffer()}
+                    className="w-full pl-6 pr-2 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
+                </div>
+                <button
+                  onClick={saveOffer}
+                  disabled={offerSaving}
+                  className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {offerSaving ? "Saving…" : "Save"}
+                </button>
+                {savedOffer && (
+                  <button
+                    onClick={clearOffer}
+                    className="text-xs text-gray-400 hover:text-red-500"
+                  >
+                    Clear
+                  </button>
+                )}
+                {savedOffer && (
+                  <span className="text-xs text-blue-600 font-medium">
+                    ✓ {fmt$(savedOffer)} saved
+                  </span>
+                )}
+              </div>
+
+              <MortgageTable listPrice={p.list_price} offerPrice={savedOffer} />
             </Section>
           )}
 

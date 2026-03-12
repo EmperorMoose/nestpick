@@ -36,6 +36,7 @@ class Property(Base):
 
     # Listing data
     list_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    offer_price: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     zestimate: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     rent_zestimate: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     price_per_sqft: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

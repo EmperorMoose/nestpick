@@ -19,6 +19,8 @@ export const propertiesApi = {
     api.post<ScrapeStatus>("/properties/scrape", { url }).then((r) => r.data),
   delete: (id: number) => api.delete(`/properties/${id}`).then((r) => r.data),
   refresh: (id: number) => api.post<ScrapeStatus>(`/properties/${id}/refresh`).then((r) => r.data),
+  setOffer: (id: number, offerPrice: number | null) =>
+    api.patch(`/properties/${id}/offer`, { offer_price: offerPrice }).then((r) => r.data),
 };
 
 export const neighborhoodApi = {

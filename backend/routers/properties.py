@@ -263,6 +263,23 @@ async def update_property(property_id: int, body: PropertyUpdate, db: AsyncSessi
     return {"id": prop.id}
 
 
+@router.patch("/{property_id}/offer", response_model=dict)
+async def set_offer_price(
+    property_id: int,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Save (or clear) an intended offer price for a property."""
+    result = await db.execute(select(Property).where(Property.id == property_id))
+    prop = result.scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+    offer = body.get("offer_price")
+    prop.offer_price = int(offer) if offer else None
+    await db.commit()
+    return {"id": prop.id, "offer_price": prop.offer_price}
+
+
 @router.delete("/{property_id}")
 async def delete_property(property_id: int, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Property).where(Property.id == property_id))

@@ -12,46 +12,73 @@ function monthlyPayment(price: number, annualRatePct: number): number {
 
 interface Props {
   listPrice: number;
+  offerPrice?: number | null;
 }
 
-export default function MortgageTable({ listPrice }: Props) {
-  const discounted = Math.round(listPrice * 0.9);
+export default function MortgageTable({ listPrice, offerPrice }: Props) {
+  const hasOffer = offerPrice != null && offerPrice > 0;
+  const listMinus10 = Math.round(listPrice * 0.9);
 
   return (
     <div>
       <p className="text-xs text-gray-400 mb-3">
-        20% down · 30-year fixed · principal & interest only
+        20% down · 30-year fixed · principal &amp; interest only
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200">
               <th className="text-left pb-2 pr-4 text-xs font-medium text-gray-500">Rate</th>
-              <th className="text-right pb-2 px-3 text-xs font-medium text-gray-500">
+
+              {/* List — dimmed + strikethrough header when offer is set */}
+              <th className={`text-right pb-2 px-3 text-xs font-medium ${hasOffer ? "text-gray-300" : "text-gray-500"}`}>
                 List&nbsp;
-                <span className="font-normal text-gray-400">({fmt$(listPrice)})</span>
+                <span className="font-normal">({fmt$(listPrice)})</span>
               </th>
-              <th className="text-right pb-2 pl-3 text-xs font-medium text-gray-500">
+
+              {/* −10% — dimmed + strikethrough header when offer is set */}
+              <th className={`text-right pb-2 px-3 text-xs font-medium ${hasOffer ? "text-gray-300" : "text-gray-500"}`}>
                 −10%&nbsp;
-                <span className="font-normal text-gray-400">({fmt$(discounted)})</span>
+                <span className="font-normal">({fmt$(listMinus10)})</span>
               </th>
+
+              {/* Offer column — blue, only visible when offer is set */}
+              {hasOffer && (
+                <th className="text-right pb-2 pl-4 text-xs font-semibold text-blue-600">
+                  Offer&nbsp;
+                  <span className="font-normal">({fmt$(offerPrice!)})</span>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
             {RATES.map((rate) => {
-              const pmtFull = Math.round(monthlyPayment(listPrice, rate));
-              const pmtDisc = Math.round(monthlyPayment(discounted, rate));
+              const pmtList = Math.round(monthlyPayment(listPrice, rate));
+              const pmtDisc = Math.round(monthlyPayment(listMinus10, rate));
+              const pmtOffer = hasOffer ? Math.round(monthlyPayment(offerPrice!, rate)) : null;
+
               return (
                 <tr key={rate} className="border-b border-gray-50 last:border-0">
                   <td className="py-1.5 pr-4 font-medium text-gray-700 tabular-nums">
                     {rate.toFixed(1)}%
                   </td>
-                  <td className="py-1.5 px-3 text-right text-gray-800 tabular-nums">
-                    {fmt$(pmtFull)}/mo
+
+                  {/* List price — strike through when offer exists */}
+                  <td className={`py-1.5 px-3 text-right tabular-nums ${hasOffer ? "text-gray-300 line-through" : "text-gray-800"}`}>
+                    {fmt$(pmtList)}/mo
                   </td>
-                  <td className="py-1.5 pl-3 text-right text-gray-500 tabular-nums">
+
+                  {/* −10% — strike through when offer exists */}
+                  <td className={`py-1.5 px-3 text-right tabular-nums ${hasOffer ? "text-gray-300 line-through" : "text-gray-500"}`}>
                     {fmt$(pmtDisc)}/mo
                   </td>
+
+                  {/* Offer payment — blue + bold */}
+                  {hasOffer && (
+                    <td className="py-1.5 pl-4 text-right text-blue-600 font-semibold tabular-nums">
+                      {fmt$(pmtOffer!)}/mo
+                    </td>
+                  )}
                 </tr>
               );
             })}
