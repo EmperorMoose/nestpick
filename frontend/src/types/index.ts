@@ -139,6 +139,21 @@ export interface ComparisonMatrix {
   rows: ComparisonMatrixRow[];
 }
 
+export const RATING_CATEGORIES = ["layout", "aesthetics", "upkeep", "yard", "area", "neighborhood", "overall"] as const;
+export type RatingCategory = typeof RATING_CATEGORIES[number];
+
+export interface PropertyRating {
+  user_name: "pierce" | "rach";
+  layout: number | null;
+  aesthetics: number | null;
+  upkeep: number | null;
+  yard: number | null;
+  area: number | null;
+  neighborhood: number | null;
+  overall: number | null;
+  updated_at: string;
+}
+
 export interface ScrapeStatus {
   success: boolean;
   property_id: number | null;

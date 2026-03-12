@@ -3,6 +3,7 @@ import { useProperty } from "@/hooks/useProperties";
 import NeighborhoodDashboard from "@/components/neighborhood/NeighborhoodDashboard";
 import PriceHistoryChart from "@/components/property/PriceHistoryChart";
 import MortgageTable from "@/components/property/MortgageTable";
+import RatingTables from "@/components/property/RatingTables";
 import { fmt$, fmtNum, fmtStatus, fmtPropertyType } from "@/lib/utils";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 
@@ -96,6 +97,10 @@ export default function PropertyPage() {
               <MortgageTable listPrice={p.list_price} />
             </Section>
           )}
+
+          <Section title="Our Ratings">
+            <RatingTables propertyId={p.id} />
+          </Section>
 
           {p.price_history.length > 0 && (
             <Section title="Price History">

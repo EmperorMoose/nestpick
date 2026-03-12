@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -76,6 +76,7 @@ class Property(Base):
     tax_history: Mapped[List[TaxHistory]] = relationship(back_populates="property", cascade="all, delete-orphan")
     schools: Mapped[List[PropertySchool]] = relationship(back_populates="property", cascade="all, delete-orphan")
     comparison_items: Mapped[List[ComparisonItem]] = relationship(back_populates="property", cascade="all, delete-orphan")
+    ratings: Mapped[List["PropertyRating"]] = relationship(back_populates="property", cascade="all, delete-orphan")
 
 
 class PriceHistory(Base):
@@ -206,3 +207,25 @@ class ComparisonItem(Base):
 
     comparison: Mapped[ComparisonList] = relationship(back_populates="items")
     property: Mapped[Property] = relationship(back_populates="comparison_items")
+
+
+class PropertyRating(Base):
+    """Per-user, per-property ratings across 7 categories (1-5 stars each)."""
+    __tablename__ = "property_ratings"
+    __table_args__ = (UniqueConstraint("property_id", "user_name", name="uq_rating_property_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    property_id: Mapped[int] = mapped_column(Integer, ForeignKey("properties.id", ondelete="CASCADE"))
+    user_name: Mapped[str] = mapped_column(String, nullable=False)  # "pierce" | "rach"
+
+    layout: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    aesthetics: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    upkeep: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    yard: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    area: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    neighborhood: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    overall: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    property: Mapped[Property] = relationship(back_populates="ratings")

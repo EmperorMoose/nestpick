@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import init_db
-from routers import comparison, neighborhood, properties
+from routers import comparison, neighborhood, properties, ratings
 
 
 @asynccontextmanager
@@ -29,6 +29,7 @@ app.add_middleware(
 app.include_router(properties.router)
 app.include_router(neighborhood.router)
 app.include_router(comparison.router)
+app.include_router(ratings.router)
 
 
 @app.get("/api/health")

@@ -5,6 +5,8 @@ import type {
   CrimeData,
   NeighborhoodData,
   Property,
+  PropertyRating,
+  RatingCategory,
   ScrapeStatus,
 } from "@/types";
 
@@ -39,6 +41,13 @@ export const comparisonApi = {
     api.post(`/comparisons/${compId}/properties/${propId}`).then((r) => r.data),
   removeProperty: (compId: number, propId: number) =>
     api.delete(`/comparisons/${compId}/properties/${propId}`).then((r) => r.data),
+};
+
+export const ratingsApi = {
+  get: (propertyId: number) =>
+    api.get<PropertyRating[]>(`/properties/${propertyId}/ratings`).then((r) => r.data),
+  upsert: (propertyId: number, user: "pierce" | "rach", ratings: Partial<Record<RatingCategory, number | null>>) =>
+    api.put<PropertyRating>(`/properties/${propertyId}/ratings/${user}`, ratings).then((r) => r.data),
 };
 
 export const healthApi = {
