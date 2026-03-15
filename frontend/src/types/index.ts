@@ -163,6 +163,7 @@ export interface CommuteData {
   distance_text: string;
   distance_meters: number;
   destination: string;
+  has_traffic_data: boolean;
 }
 
 export interface ScrapeStatus {

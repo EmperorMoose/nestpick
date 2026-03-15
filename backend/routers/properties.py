@@ -358,32 +358,52 @@ async def get_commute(property_id: int, db: AsyncSession = Depends(get_db)):
     if target <= now:
         target += timedelta(days=7)
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(
-            "https://maps.googleapis.com/maps/api/distancematrix/json",
-            params={
-                "origins": f"{prop.lat},{prop.lng}",
-                "destinations": settings.commute_destination,
-                "departure_time": int(target.timestamp()),
-                "traffic_model": "best_guess",
-                "key": settings.google_maps_api_key,
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.post(
+            "https://routes.googleapis.com/directions/v2:computeRoutes",
+            headers={
+                "X-Goog-Api-Key": settings.google_maps_api_key,
+                "X-Goog-FieldMask": "routes.duration,routes.distanceMeters",
+            },
+            json={
+                "origin": {"location": {"latLng": {"latitude": prop.lat, "longitude": prop.lng}}},
+                "destination": {"address": settings.commute_destination},
+                "travelMode": "DRIVE",
+                "routingPreference": "TRAFFIC_AWARE",
+                "departureTime": target.strftime("%Y-%m-%dT%H:%M:%SZ"),
             },
         )
 
     data = resp.json()
+    if "error" in data:
+        raise HTTPException(status_code=502, detail=data["error"].get("message", "Google Routes API error"))
+
     try:
-        element = data["rows"][0]["elements"][0]
-        if element["status"] != "OK":
-            raise HTTPException(status_code=400, detail=f"Route unavailable: {element['status']}")
-        return {
-            "duration_text": element["duration_in_traffic"]["text"],
-            "duration_seconds": element["duration_in_traffic"]["value"],
-            "distance_text": element["distance"]["text"],
-            "distance_meters": element["distance"]["value"],
-            "destination": settings.commute_destination,
-        }
-    except (KeyError, IndexError):
-        raise HTTPException(status_code=500, detail="Unexpected Google Maps response")
+        route = data["routes"][0]
+        duration_seconds = int(route["duration"].rstrip("s"))
+        distance_meters = route["distanceMeters"]
+    except (KeyError, IndexError, ValueError):
+        raise HTTPException(status_code=500, detail=f"Unexpected Routes API response: {data}")
+
+    # Format duration as "X hr Y min" or "Y min"
+    minutes = round(duration_seconds / 60)
+    if minutes >= 60:
+        duration_text = f"{minutes // 60} hr {minutes % 60} min"
+    else:
+        duration_text = f"{minutes} min"
+
+    # Format distance as miles
+    miles = distance_meters / 1609.34
+    distance_text = f"{miles:.1f} mi"
+
+    return {
+        "duration_text": duration_text,
+        "duration_seconds": duration_seconds,
+        "distance_text": distance_text,
+        "distance_meters": distance_meters,
+        "destination": settings.commute_destination,
+        "has_traffic_data": True,
+    }
 
 
 @router.delete("/{property_id}")

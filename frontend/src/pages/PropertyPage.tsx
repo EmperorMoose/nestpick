@@ -227,7 +227,9 @@ export default function PropertyPage() {
                 <div className="flex items-end gap-2 mb-1">
                   <span className="text-3xl font-bold text-gray-800">{commute.duration_text}</span>
                 </div>
-                <p className="text-xs text-gray-400 mb-3">Rush hour · Mon 8:30 AM · {commute.distance_text}</p>
+                <p className="text-xs text-gray-400 mb-3">
+                  {commute.has_traffic_data ? "Rush hour · Mon 8:30 AM" : "Drive time (no traffic data)"} · {commute.distance_text}
+                </p>
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
                   <MapPin size={12} />
                   <span className="truncate">{commute.destination}</span>
