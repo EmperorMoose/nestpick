@@ -157,6 +157,14 @@ export interface PropertyRating {
   updated_at: string;
 }
 
+export interface CommuteData {
+  duration_text: string;
+  duration_seconds: number;
+  distance_text: string;
+  distance_meters: number;
+  destination: string;
+}
+
 export interface ScrapeStatus {
   success: boolean;
   property_id: number | null;

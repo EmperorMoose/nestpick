@@ -120,14 +120,35 @@ async def scrape_playwright(url: str) -> dict[str, Any]:
         raise ZillowBlockedError("Playwright not installed")
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+            ],
+        )
         context = await browser.new_context(
             user_agent=HEADERS["User-Agent"],
             viewport={"width": 1920, "height": 1080},
             locale="en-US",
+            extra_http_headers={
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            },
+        )
+        # Remove webdriver fingerprint that Zillow checks
+        await context.add_init_script(
+            "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
         )
         page = await context.new_page()
-        await page.goto(url, wait_until="networkidle", timeout=30000)
+        try:
+            await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+        except Exception:
+            pass
+        # Give JS time to hydrate __NEXT_DATA__
+        await asyncio.sleep(random.uniform(2.0, 4.0))
         content = await page.content()
         await browser.close()
 

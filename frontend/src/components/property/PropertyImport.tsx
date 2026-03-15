@@ -11,10 +11,11 @@ export default function PropertyImport() {
     e.preventDefault();
     if (!url.trim()) return;
     const result = await scrape.mutateAsync(url.trim());
-    if (result.success) {
+    if (result.success && result.zillow_ok) {
       setUrl("");
       setOpen(false);
     }
+    // If zillow failed but polaris succeeded, keep dialog open so user sees the warning
   }
 
   if (!open) {
@@ -55,8 +56,15 @@ export default function PropertyImport() {
           )}
 
           {scrape.data && !scrape.data.success && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
+              <p className="font-medium text-red-800">Could not save property</p>
+              <p className="text-red-700">{scrape.data.message}</p>
+            </div>
+          )}
+
+          {scrape.data?.success && !scrape.data.zillow_ok && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
-              <p className="font-medium text-yellow-800">Partial data only</p>
+              <p className="font-medium text-yellow-800">Saved with partial data</p>
               <p className="text-yellow-700">{scrape.data.message}</p>
             </div>
           )}
@@ -64,26 +72,28 @@ export default function PropertyImport() {
           <div className="flex gap-2 justify-end">
             <button
               type="button"
-              onClick={() => { setOpen(false); scrape.reset(); }}
+              onClick={() => { setOpen(false); scrape.reset(); setUrl(""); }}
               className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
               disabled={scrape.isPending}
             >
-              Cancel
+              {scrape.data?.success ? "Done" : "Cancel"}
             </button>
-            <button
-              type="submit"
-              disabled={scrape.isPending || !url.trim()}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
-            >
-              {scrape.isPending ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  Scraping…
-                </>
-              ) : (
-                "Import Property"
-              )}
-            </button>
+            {!scrape.data?.success && (
+              <button
+                type="submit"
+                disabled={scrape.isPending || !url.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm font-medium"
+              >
+                {scrape.isPending ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Scraping…
+                  </>
+                ) : (
+                  "Import Property"
+                )}
+              </button>
+            )}
           </div>
         </form>
       </div>

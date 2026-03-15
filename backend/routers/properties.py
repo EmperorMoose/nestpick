@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from config import settings
 from database import get_db
 from models import PriceHistory, Property, PropertyRating, PropertySchool, School, TaxHistory
 from schemas.property_schema import (
@@ -262,10 +265,15 @@ async def scrape_property(
             county_fips=county_fips,
         )
 
+    if zillow_ok:
+        msg = "Property saved successfully."
+    else:
+        msg = "Saved using county records only — Zillow data (price, photos, description) is unavailable. This is common on the deployed server."
+
     return ScrapeStatus(
         success=True,
         property_id=prop.id,
-        message="Property saved successfully.",
+        message=msg,
         zillow_ok=zillow_ok,
         polaris_ok=polaris_ok,
     )
@@ -326,6 +334,56 @@ async def set_offer_price(
     prop.offer_price = int(offer) if offer else None
     await db.commit()
     return {"id": prop.id, "offer_price": prop.offer_price}
+
+
+@router.get("/{property_id}/commute", response_model=dict)
+async def get_commute(property_id: int, db: AsyncSession = Depends(get_db)):
+    """Return rush-hour commute time from the property to the configured destination."""
+    if not settings.google_maps_api_key:
+        raise HTTPException(status_code=503, detail="GOOGLE_MAPS_API_KEY not configured")
+
+    result = await db.execute(select(Property).where(Property.id == property_id))
+    prop = result.scalar_one_or_none()
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+    if not prop.lat or not prop.lng:
+        raise HTTPException(status_code=400, detail="Property has no coordinates")
+
+    # Next Monday at 8:30 AM (use historical traffic data)
+    now = datetime.now()
+    days = (7 - now.weekday()) % 7  # 0 if today is Monday, else days until next Monday
+    if days == 0 and now.hour >= 9:
+        days = 7
+    target = (now + timedelta(days=days or 7)).replace(hour=8, minute=30, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(days=7)
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(
+            "https://maps.googleapis.com/maps/api/distancematrix/json",
+            params={
+                "origins": f"{prop.lat},{prop.lng}",
+                "destinations": settings.commute_destination,
+                "departure_time": int(target.timestamp()),
+                "traffic_model": "best_guess",
+                "key": settings.google_maps_api_key,
+            },
+        )
+
+    data = resp.json()
+    try:
+        element = data["rows"][0]["elements"][0]
+        if element["status"] != "OK":
+            raise HTTPException(status_code=400, detail=f"Route unavailable: {element['status']}")
+        return {
+            "duration_text": element["duration_in_traffic"]["text"],
+            "duration_seconds": element["duration_in_traffic"]["value"],
+            "distance_text": element["distance"]["text"],
+            "distance_meters": element["distance"]["value"],
+            "destination": settings.commute_destination,
+        }
+    except (KeyError, IndexError):
+        raise HTTPException(status_code=500, detail="Unexpected Google Maps response")
 
 
 @router.delete("/{property_id}")

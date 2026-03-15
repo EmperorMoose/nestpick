@@ -1,5 +1,6 @@
 import axios from "axios";
 import type {
+  CommuteData,
   ComparisonList,
   ComparisonMatrix,
   CrimeData,
@@ -23,6 +24,8 @@ export const propertiesApi = {
     api.patch(`/properties/${id}/offer`, { offer_price: offerPrice }).then((r) => r.data),
   toggleTop: (id: number) =>
     api.patch(`/properties/${id}/top`).then((r) => r.data),
+  getCommute: (id: number) =>
+    api.get<CommuteData>(`/properties/${id}/commute`).then((r) => r.data),
 };
 
 export const neighborhoodApi = {
