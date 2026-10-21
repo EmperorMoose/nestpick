@@ -2,8 +2,8 @@ import { useRatings, useUpsertRating } from "@/hooks/useRatings";
 import { RATING_CATEGORIES, type PropertyRating, type RatingCategory } from "@/types";
 
 const USERS: { key: "pierce" | "rach"; label: string }[] = [
-  { key: "pierce", label: "Pierce" },
-  { key: "rach", label: "Rach" },
+  { key: "pierce", label: "Caleb" },
+  { key: "rach", label: "Kass" },
 ];
 
 const CATEGORY_LABELS: Record<RatingCategory, string> = {
@@ -148,7 +148,7 @@ export default function RatingTables({ propertyId }: { propertyId: number }) {
           ))}
         </div>
 
-        {/* Pierce + Rach columns */}
+        {/* Display names retain the existing storage keys to preserve saved ratings. */}
         {USERS.map(({ key, label }) => (
           <UserRatingColumn
             key={key}

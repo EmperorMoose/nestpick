@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import random
 import re
 from typing import Any
@@ -13,11 +14,14 @@ from typing import Any
 import httpx
 from bs4 import BeautifulSoup
 
+logger = logging.getLogger(__name__)
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
+    # Only advertise encodings supported by the installed HTTP client dependencies.
+    "Accept-Encoding": "gzip, deflate",
     "Sec-Fetch-Dest": "document",
     "Sec-Fetch-Mode": "navigate",
     "Sec-Fetch-Site": "none",
@@ -110,6 +114,8 @@ async def scrape_httpx(url: str) -> dict[str, Any]:
     if response.status_code in (403, 429, 451):
         raise ZillowBlockedError(f"httpx blocked: HTTP {response.status_code}")
 
+    response.raise_for_status()
+
     return _parse_html(response.text)
 
 
@@ -157,11 +163,17 @@ async def scrape_playwright(url: str) -> dict[str, Any]:
 
 def _parse_html(html: str) -> dict[str, Any]:
     soup = BeautifulSoup(html, "lxml")
+    title = soup.title.get_text().lower() if soup.title else ""
+    if "access to this page has been denied" in title or "press & hold to confirm" in soup.get_text(" ", strip=True).lower():
+        raise ZillowBlockedError("Zillow returned a human-verification page; listing data is unavailable")
 
     # Primary: __NEXT_DATA__ script tag
     script_tag = soup.find("script", {"id": "__NEXT_DATA__"})
     if script_tag and script_tag.string:
-        return _extract_from_next_data(json.loads(script_tag.string))
+        try:
+            return _extract_from_next_data(json.loads(script_tag.string))
+        except (ZillowParseError, json.JSONDecodeError):
+            pass  # Other embedded data may still contain the listing.
 
     # Fallback: hdpApolloPreloadedData inline variable
     match = re.search(r'hdpApolloPreloadedData\s*=\s*(\{.*?\});\s*</script>', html, re.DOTALL)
@@ -227,9 +239,14 @@ def _normalize_property(raw: dict) -> dict[str, Any]:
 
     # Extract schools
     schools = []
-    for s in g("nearbySchools", "schools", default=[]) or []:
+    school_data = g("schools") or g("nearbySchools", default=[]) or []
+    if isinstance(school_data, dict):
+        school_data = school_data.get("schools", [])
+    for s in school_data:
+        if not isinstance(s, dict):
+            continue
         schools.append({
-            "name": g("name", default=None) if isinstance(s, str) else s.get("name"),
+            "name": s.get("name"),
             "school_type": s.get("grades", ""),
             "greatschools_rating": s.get("rating"),
             "distance": s.get("distance"),
@@ -258,7 +275,8 @@ def _normalize_property(raw: dict) -> dict[str, Any]:
     photos = []
     for img in g("responsivePhotos", default=[]) or g("photos", default=[]) or []:
         if isinstance(img, dict):
-            url = img.get("url") or img.get("mixedSources", {}).get("jpeg", [{}])[0].get("url", "")
+            sources = (img.get("mixedSources") or {}).get("jpeg") or []
+            url = img.get("url") or (sources[0].get("url", "") if sources else "")
             if url:
                 photos.append(url)
         elif isinstance(img, str):
@@ -311,8 +329,8 @@ async def scrape(url: str) -> dict[str, Any]:
         result = await scrape_httpx(url)
         result["_scrape_method"] = "httpx"
         return result
-    except ZillowBlockedError:
-        pass
+    except (ZillowBlockedError, ZillowParseError, httpx.HTTPError, json.JSONDecodeError) as exc:
+        logger.warning("Zillow HTTP extraction failed (%s); trying browser", type(exc).__name__)
 
     # Playwright fallback
     result = await scrape_playwright(url)

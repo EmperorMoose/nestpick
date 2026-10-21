@@ -18,8 +18,7 @@ class Settings(BaseSettings):
 
     database_url: str = _default_db_url
     walkscore_api_key: str = ""
-    google_maps_api_key: str = ""
-    commute_destination: str = "2825 South Blvd, Charlotte, NC 28209"
+    census_api_key: str = ""
     # Add your deployed domain to CORS_ORIGINS env var (comma-separated) if needed.
     # In production the frontend is served by the backend (same origin), so CORS
     # only matters for local dev.

@@ -22,7 +22,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 export default function NeighborhoodDashboard({ propertyId, schools }: Props) {
-  const { data: nd, isLoading, isError } = useNeighborhood(propertyId);
+  const { data: nd, isLoading, isError, refetch, isFetching } = useNeighborhood(propertyId);
 
   if (isLoading) return <p className="text-sm text-gray-500 animate-pulse">Loading neighborhood data…</p>;
   if (isError) return (
@@ -60,6 +60,8 @@ export default function NeighborhoodDashboard({ propertyId, schools }: Props) {
       {/* Economic Stats */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Neighborhood Economics</h3>
+        <p className="text-xs text-gray-400 mb-2">{nd.acs_vintage ? `${nd.acs_vintage} ACS 5-year estimates · Census tract` : "Census tract estimates"}</p>
+        {nd.median_income == null && <p className="text-xs text-gray-500 mb-2">Economics are still unavailable. <button onClick={() => refetch()} disabled={isFetching} className="text-blue-600 underline disabled:opacity-50">{isFetching ? "Checking…" : "Retry"}</button></p>}
         <div className="grid grid-cols-2 gap-2">
           <Stat label="Median Income" value={fmt$(nd.median_income)} />
           <Stat label="Median Home Value" value={fmt$(nd.median_home_value)} />
@@ -68,7 +70,6 @@ export default function NeighborhoodDashboard({ propertyId, schools }: Props) {
           <Stat label="Owner-Occupied" value={fmtPct(nd.pct_owner_occupied)} />
           <Stat label="College Degree" value={fmtPct(nd.pct_college_degree)} />
           <Stat label="Poverty Rate" value={fmtPct(nd.pct_poverty)} />
-          <Stat label="Avg Commute" value={nd.avg_commute_min ? `${nd.avg_commute_min.toFixed(0)} min` : "—"} />
         </div>
       </div>
 

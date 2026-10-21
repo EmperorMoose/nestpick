@@ -2,8 +2,13 @@
 from __future__ import annotations
 
 import httpx
+import logging
+from config import settings
 
-ACS_BASE = "https://api.census.gov/data/2023/acs/acs5"
+ACS_YEAR = 2024
+ACS_BASE = f"https://api.census.gov/data/{ACS_YEAR}/acs/acs5"
+REPORTER_URL = f"https://api.censusreporter.org/1.0/data/show/acs{ACS_YEAR}_5yr"
+logger = logging.getLogger(__name__)
 
 VARIABLES = {
     "B19013_001E": "median_income",
@@ -38,23 +43,37 @@ async def fetch_tract_demographics(state_fips: str, county_fips: str, tract: str
         "for": f"tract:{tract}",
         "in": f"state:{state_fips} county:{county_fips}",
     }
-    # Retry up to 2 times — Census API can be slow
-    for attempt in range(2):
-        async with httpx.AsyncClient(timeout=30) as client:
+    row = None
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        if settings.census_api_key:
             try:
+                params["key"] = settings.census_api_key
                 r = await client.get(ACS_BASE, params=params)
+                r.raise_for_status()
                 data = r.json()
-                break
+                if isinstance(data, list) and len(data) >= 2:
+                    row = dict(zip(data[0], data[1]))
             except Exception:
-                if attempt == 1:
-                    return {}
-                continue
+                logger.warning("Census API unavailable; trying Census Reporter")
+        if row is None:
+            try:
+                geoid = f"14000US{state_fips}{county_fips}{tract}"
+                tables = sorted({key.split("_")[0] for key in VARIABLES})
+                r = await client.get(REPORTER_URL, params={"table_ids": ",".join(tables), "geo_ids": geoid})
+                r.raise_for_status()
+                records = r.json()["data"][geoid]
+                row = {
+                    key: records.get(key.split("_")[0], {}).get("estimate", {}).get(key.replace("_", "")[:-1])
+                    for key in VARIABLES
+                }
+            except Exception:
+                logger.warning("ACS economics unavailable from Census Reporter")
+                return {}
 
-    if len(data) < 2:
-        return {}
+    return _parse_row(row)
 
-    headers, values = data[0], data[1]
-    row = dict(zip(headers, values))
+
+def _parse_row(row: dict) -> dict:
 
     def safe_int(key: str) -> int | None:
         v = row.get(key)
@@ -70,23 +89,23 @@ async def fetch_tract_demographics(state_fips: str, county_fips: str, tract: str
             return None
         return round(n / d * 100, 1)
 
-    total_pop = safe_int("B01003_001E") or 1
-    total_race = safe_int("B02001_001E") or total_pop
-    college_pop = sum(filter(None, [safe_int(k) for k in ["B15003_022E", "B15003_023E", "B15003_024E", "B15003_025E"]]))
-    pop_25 = safe_int("B15003_001E") or 1
+    college_values = [safe_int(k) for k in ["B15003_022E", "B15003_023E", "B15003_024E", "B15003_025E"]]
+    college_pop = sum(college_values) if all(v is not None for v in college_values) else None
+    pop_25 = safe_int("B15003_001E")
 
     return {
+        "acs_vintage": ACS_YEAR,
         "median_income": safe_int("B19013_001E"),
         "median_home_value": safe_int("B25077_001E"),
         "median_rent": safe_int("B25064_001E"),
         "total_population": safe_int("B01003_001E"),
         "pct_owner_occupied": pct("B25003_002E", "B25003_001E"),
-        "pct_college_degree": round(college_pop / pop_25 * 100, 1) if pop_25 else None,
+        "pct_college_degree": round(college_pop / pop_25 * 100, 1) if pop_25 and college_pop is not None else None,
         "pct_poverty": pct("B17001_002E", "B17001_001E"),
         "pct_unemployed": pct("B23025_005E", "B23025_003E"),
         "median_year_built": safe_int("B25035_001E"),
-        "pct_white": round(safe_int("B02001_002E") / total_race * 100, 1) if total_race else None,
-        "pct_black": round(safe_int("B02001_003E") / total_race * 100, 1) if total_race else None,
-        "pct_hispanic": round(safe_int("B03002_012E") / total_race * 100, 1) if total_race else None,
-        "pct_asian": round(safe_int("B02001_005E") / total_race * 100, 1) if total_race else None,
+        "pct_white": pct("B02001_002E", "B02001_001E"),
+        "pct_black": pct("B02001_003E", "B02001_001E"),
+        "pct_hispanic": pct("B03002_012E", "B01003_001E"),
+        "pct_asian": pct("B02001_005E", "B02001_001E"),
     }

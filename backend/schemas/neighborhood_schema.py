@@ -14,6 +14,7 @@ class CrimeIncident(BaseModel):
 
 
 class NeighborhoodResponse(BaseModel):
+    acs_vintage: int | None = None
     census_tract: str
     # ACS
     median_income: int | None
@@ -25,7 +26,6 @@ class NeighborhoodResponse(BaseModel):
     pct_poverty: float | None
     pct_unemployed: float | None
     median_year_built: int | None
-    avg_commute_min: float | None
     pct_white: float | None
     pct_black: float | None
     pct_hispanic: float | None

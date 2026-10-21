@@ -1,14 +1,14 @@
 import { useParams, Link } from "react-router-dom";
 import { useState } from "react";
 import { useProperty } from "@/hooks/useProperties";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { propertiesApi } from "@/lib/api";
 import NeighborhoodDashboard from "@/components/neighborhood/NeighborhoodDashboard";
 import PriceHistoryChart from "@/components/property/PriceHistoryChart";
 import MortgageTable from "@/components/property/MortgageTable";
 import RatingTables from "@/components/property/RatingTables";
 import { fmt$, fmtNum, fmtStatus, fmtPropertyType } from "@/lib/utils";
-import { ArrowLeft, Car, ExternalLink, MapPin } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -65,13 +65,6 @@ export default function PropertyPage() {
     }
   }
 
-  const { data: commute, isLoading: commuteLoading, error: commuteError, refetch: fetchCommute, isFetched: commuteFetched } = useQuery({
-    queryKey: ["commute", Number(id)],
-    queryFn: () => propertiesApi.getCommute(Number(id)),
-    enabled: false, // only fetch on demand
-    staleTime: 60 * 60 * 1000, // 1 hour
-    retry: false,
-  });
 
   if (isLoading) return <div className="h-64 bg-gray-100 rounded-xl animate-pulse" />;
   if (!p) return <p className="text-gray-500">Property not found.</p>;
@@ -175,7 +168,7 @@ export default function PropertyPage() {
                 )}
               </div>
 
-              <MortgageTable listPrice={p.list_price} offerPrice={savedOffer} />
+              <MortgageTable key={p.id} listPrice={p.list_price} offerPrice={savedOffer} annualTax={p.annual_tax} hoaFee={p.hoa_fee} />
             </Section>
           )}
 
@@ -196,56 +189,8 @@ export default function PropertyPage() {
           )}
         </div>
 
-        {/* Right: Commute + Neighborhood */}
+        {/* Right: Neighborhood */}
         <div className="space-y-4">
-          <Section title="Commute to AssetMark">
-            {!commuteFetched && !commuteLoading && (
-              <button
-                onClick={() => fetchCommute()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-              >
-                <Car size={15} />
-                Check Rush Hour Commute
-              </button>
-            )}
-
-            {commuteLoading && (
-              <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
-                <Car size={15} className="animate-pulse" />
-                Calculating…
-              </div>
-            )}
-
-            {commuteError && (
-              <p className="text-sm text-red-500">
-                {(commuteError as any)?.response?.data?.detail ?? "Could not load commute. Check that GOOGLE_MAPS_API_KEY is set."}
-              </p>
-            )}
-
-            {commute && (
-              <div>
-                <div className="flex items-end gap-2 mb-1">
-                  <span className="text-3xl font-bold text-gray-800">{commute.duration_text}</span>
-                </div>
-                <p className="text-xs text-gray-400 mb-3">
-                  {commute.has_traffic_data ? "Rush hour · Mon 8:30 AM" : "Drive time (no traffic data)"} · {commute.distance_text}
-                </p>
-                <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-3">
-                  <MapPin size={12} />
-                  <span className="truncate">{commute.destination}</span>
-                </div>
-                <a
-                  href={`https://www.google.com/maps/dir/?api=1&origin=${p.lat},${p.lng}&destination=${encodeURIComponent(commute.destination)}&travelmode=driving`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline"
-                >
-                  Open in Google Maps <ExternalLink size={11} />
-                </a>
-              </div>
-            )}
-          </Section>
-
           <Section title="Neighborhood">
             <NeighborhoodDashboard propertyId={p.id} schools={p.schools} />
           </Section>

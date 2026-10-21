@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, Field, field_validator
+from urllib.parse import urlparse
 
 
 class PriceHistoryItem(BaseModel):
@@ -53,6 +54,30 @@ class PropertyCreate(PropertyBase):
 
 class PropertyScrapeRequest(BaseModel):
     url: str
+
+
+class BrowserListingImport(PropertyCreate):
+    address: str = Field(min_length=1, max_length=500)
+    zillow_url: str
+    photos: list[HttpUrl] = Field(default_factory=list, max_length=20)
+    home_status: str | None = None
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
+
+    @field_validator("zillow_url")
+    @classmethod
+    def listing_url(cls, value):
+        parsed = urlparse(value)
+        if parsed.scheme != "https" or parsed.hostname not in {"zillow.com", "www.zillow.com"} or "/homedetails/" not in parsed.path:
+            raise ValueError("Use a Zillow home details URL")
+        return value.split("?")[0].split("#")[0]
+
+    @field_validator("address")
+    @classmethod
+    def nonblank_address(cls, value):
+        if not value.strip():
+            raise ValueError("Address is required")
+        return value.strip()
 
 
 class PropertyUpdate(BaseModel):

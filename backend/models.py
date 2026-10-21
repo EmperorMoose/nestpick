@@ -124,7 +124,6 @@ class NeighborhoodData(Base):
     pct_poverty: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     pct_unemployed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     median_year_built: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    avg_commute_min: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # Racial composition
     pct_white: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

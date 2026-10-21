@@ -4,12 +4,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
+from database import get_db, AsyncSessionLocal
 from models import NeighborhoodData, Property
 from schemas.neighborhood_schema import NeighborhoodResponse
 from services import crime_service, enrichment_service, geocoder
 
 router = APIRouter(prefix="/api", tags=["neighborhood"])
+
+
+async def _enrich_neighborhood(**kwargs):
+    # Background work must own its session rather than reusing a request session.
+    async with AsyncSessionLocal() as session:
+        await enrichment_service.enrich_property(db=session, **kwargs)
 
 
 @router.get("/neighborhood/{census_tract}", response_model=NeighborhoodResponse)
@@ -34,8 +40,19 @@ async def get_property_neighborhood(
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
 
+    # Browser imports may include an address but no coordinates.
+    if prop.lat is None or prop.lng is None:
+        address = " ".join(str(part) for part in [prop.address, prop.city, prop.state, prop.zip] if part)
+        geo = await geocoder.geocode(address)
+        if geo.get("lat") is not None and geo.get("lng") is not None:
+            prop.lat, prop.lng = geo["lat"], geo["lng"]
+        if geo.get("census_tract"):
+            prop.census_tract = geo["census_tract"]
+            prop.census_block = geo.get("census_block")
+        await db.commit()
+
     # If census_tract is missing but we have coordinates, resolve it on-demand
-    if not prop.census_tract and prop.lat and prop.lng:
+    if not prop.census_tract and prop.lat is not None and prop.lng is not None:
         geo = await geocoder.census_tract_from_coords(prop.lat, prop.lng)
         if geo.get("census_tract"):
             prop.census_tract = geo["census_tract"]
@@ -54,8 +71,7 @@ async def get_property_neighborhood(
     # Helper for scheduling enrichment
     def _enqueue_enrichment():
         background_tasks.add_task(
-            enrichment_service.enrich_property,
-            db=db,
+            _enrich_neighborhood,
             lat=prop.lat,
             lng=prop.lng,
             census_tract=prop.census_tract,

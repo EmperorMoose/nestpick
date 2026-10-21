@@ -1,6 +1,5 @@
 import axios from "axios";
 import type {
-  CommuteData,
   ComparisonList,
   ComparisonMatrix,
   CrimeData,
@@ -14,6 +13,8 @@ import type {
 const api = axios.create({ baseURL: "/api" });
 
 export const propertiesApi = {
+  importBrowser: (data: Record<string, unknown>) =>
+    api.post<{ id: number; address: string }>("/properties/browser-import", data).then((r) => r.data),
   list: () => api.get<Property[]>("/properties").then((r) => r.data),
   get: (id: number) => api.get<Property>(`/properties/${id}`).then((r) => r.data),
   scrape: (url: string) =>
@@ -24,8 +25,6 @@ export const propertiesApi = {
     api.patch(`/properties/${id}/offer`, { offer_price: offerPrice }).then((r) => r.data),
   toggleTop: (id: number) =>
     api.patch(`/properties/${id}/top`).then((r) => r.data),
-  getCommute: (id: number) =>
-    api.get<CommuteData>(`/properties/${id}/commute`).then((r) => r.data),
 };
 
 export const neighborhoodApi = {

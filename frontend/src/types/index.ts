@@ -71,6 +71,7 @@ export interface Property {
 }
 
 export interface NeighborhoodData {
+  acs_vintage?: number | null;
   census_tract: string;
   median_income: number | null;
   median_home_value: number | null;
@@ -81,7 +82,6 @@ export interface NeighborhoodData {
   pct_poverty: number | null;
   pct_unemployed: number | null;
   median_year_built: number | null;
-  avg_commute_min: number | null;
   pct_white: number | null;
   pct_black: number | null;
   pct_hispanic: number | null;
@@ -155,15 +155,6 @@ export interface PropertyRating {
   neighborhood: number | null;
   overall: number | null;
   updated_at: string;
-}
-
-export interface CommuteData {
-  duration_text: string;
-  duration_seconds: number;
-  distance_text: string;
-  distance_meters: number;
-  destination: string;
-  has_traffic_data: boolean;
 }
 
 export interface ScrapeStatus {

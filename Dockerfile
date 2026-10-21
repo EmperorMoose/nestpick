@@ -10,10 +10,10 @@ RUN npm run build
 FROM mcr.microsoft.com/playwright/python:v1.49.1-jammy
 WORKDIR /app
 
-# Install Python deps (playwright already installed in base image, so skip re-installing it)
+# The base image includes browsers and OS deps, but not the Python package.
+# Keep the pinned Playwright package version aligned with the image version.
 COPY backend/requirements.txt .
-RUN grep -v "playwright" requirements.txt \
-    | pip install --no-cache-dir -r /dev/stdin
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Create the /data directory for the Railway persistent volume mount point.
 # Railway will overlay the real volume here at runtime; this just ensures the

@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useScrapeProperty } from "@/hooks/useProperties";
 import { Loader2, Plus } from "lucide-react";
+import BrowserImport from "./BrowserImport";
 
 export default function PropertyImport() {
   const [url, setUrl] = useState("");
   const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"browser" | "url">("browser");
   const scrape = useScrapeProperty();
 
   async function handleSubmit(e: React.FormEvent) {
@@ -32,11 +34,17 @@ export default function PropertyImport() {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4">
+      <div role="dialog" aria-modal="true" aria-label="Add a House" className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-semibold mb-1">Add a House</h2>
         <p className="text-sm text-gray-500 mb-4">
-          Paste a Zillow listing URL — we'll scrape property data and neighborhood stats automatically.
+          Import from a listing open in your browser, or try a URL lookup.
         </p>
+
+        <div className="flex gap-2 mb-4">
+          <button onClick={() => setMode("browser")} className={`rounded-lg px-3 py-2 text-sm ${mode === "browser" ? "bg-blue-100 text-blue-700" : "bg-gray-100"}`}>Browser import</button>
+          <button onClick={() => setMode("url")} className={`rounded-lg px-3 py-2 text-sm ${mode === "url" ? "bg-blue-100 text-blue-700" : "bg-gray-100"}`}>URL lookup</button>
+        </div>
+        {mode === "browser" ? <><BrowserImport /><button onClick={() => setOpen(false)} className="mt-4 text-sm text-gray-500">Cancel</button></> : (
 
         <form onSubmit={handleSubmit} className="space-y-3">
           <input
@@ -96,6 +104,7 @@ export default function PropertyImport() {
             )}
           </div>
         </form>
+        )}
       </div>
     </div>
   );

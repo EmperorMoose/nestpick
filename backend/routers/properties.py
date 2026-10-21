@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+import logging
 from typing import Any
 
-import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import settings
 from database import get_db
 from models import PriceHistory, Property, PropertyRating, PropertySchool, School, TaxHistory
 from schemas.property_schema import (
@@ -20,6 +18,7 @@ from schemas.property_schema import (
     PropertyScrapeRequest,
     PropertyUpdate,
     ScrapeStatus,
+    BrowserListingImport,
 )
 from services import geocoder, polaris_service, enrichment_service
 from services import zillow_scraper
@@ -142,7 +141,7 @@ async def scrape_property(
         zillow_data = await zillow_scraper.scrape(body.url)
         zillow_ok = True
     except Exception:
-        pass
+        logging.getLogger(__name__).exception("Zillow import failed; trying county records")
 
     # 3. Always try POLARIS via address parsed from URL (independent of Zillow)
     if street_number and street_name_frag:
@@ -279,6 +278,34 @@ async def scrape_property(
     )
 
 
+@router.post("/browser-import", response_model=dict)
+async def import_browser_listing(body: BrowserListingImport, db: AsyncSession = Depends(get_db)):
+    """Save user-copied listing data without requesting Zillow from the server."""
+    _, zpid = zillow_scraper.extract_address_from_url(body.zillow_url)
+    result = await db.execute(select(Property).where(
+        (Property.zillow_url == body.zillow_url) | (Property.zpid == zpid if zpid else False)
+    ))
+    prop = result.scalars().first()
+    if prop is None:
+        prop = Property(address=body.address)
+        db.add(prop)
+    values = body.model_dump(exclude={"photos"}, exclude_none=True, exclude_unset=True)
+    for field, value in values.items():
+        if value != "":
+            setattr(prop, field, value)
+    if body.photos:
+        prop.photos_json = json.dumps([str(url) for url in body.photos])
+    if zpid:
+        prop.zpid = zpid
+        prop.zillow_id = zpid
+    prop.data_source = "browser_import"
+    if prop.list_price and prop.living_area:
+        prop.price_per_sqft = round(prop.list_price / prop.living_area, 2)
+    await db.commit()
+    await db.refresh(prop)
+    return {"id": prop.id, "address": prop.address}
+
+
 @router.post("/manual", response_model=dict)
 async def create_manual(body: PropertyCreate, db: AsyncSession = Depends(get_db)):
     geo = await geocoder.geocode(body.address)
@@ -334,76 +361,6 @@ async def set_offer_price(
     prop.offer_price = int(offer) if offer else None
     await db.commit()
     return {"id": prop.id, "offer_price": prop.offer_price}
-
-
-@router.get("/{property_id}/commute", response_model=dict)
-async def get_commute(property_id: int, db: AsyncSession = Depends(get_db)):
-    """Return rush-hour commute time from the property to the configured destination."""
-    if not settings.google_maps_api_key:
-        raise HTTPException(status_code=503, detail="GOOGLE_MAPS_API_KEY not configured")
-
-    result = await db.execute(select(Property).where(Property.id == property_id))
-    prop = result.scalar_one_or_none()
-    if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
-    if not prop.lat or not prop.lng:
-        raise HTTPException(status_code=400, detail="Property has no coordinates")
-
-    # Next Monday at 8:30 AM (use historical traffic data)
-    now = datetime.now()
-    days = (7 - now.weekday()) % 7  # 0 if today is Monday, else days until next Monday
-    if days == 0 and now.hour >= 9:
-        days = 7
-    target = (now + timedelta(days=days or 7)).replace(hour=8, minute=30, second=0, microsecond=0)
-    if target <= now:
-        target += timedelta(days=7)
-
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.post(
-            "https://routes.googleapis.com/directions/v2:computeRoutes",
-            headers={
-                "X-Goog-Api-Key": settings.google_maps_api_key,
-                "X-Goog-FieldMask": "routes.duration,routes.distanceMeters",
-            },
-            json={
-                "origin": {"location": {"latLng": {"latitude": prop.lat, "longitude": prop.lng}}},
-                "destination": {"address": settings.commute_destination},
-                "travelMode": "DRIVE",
-                "routingPreference": "TRAFFIC_AWARE",
-                "departureTime": target.strftime("%Y-%m-%dT%H:%M:%SZ"),
-            },
-        )
-
-    data = resp.json()
-    if "error" in data:
-        raise HTTPException(status_code=502, detail=data["error"].get("message", "Google Routes API error"))
-
-    try:
-        route = data["routes"][0]
-        duration_seconds = int(route["duration"].rstrip("s"))
-        distance_meters = route["distanceMeters"]
-    except (KeyError, IndexError, ValueError):
-        raise HTTPException(status_code=500, detail=f"Unexpected Routes API response: {data}")
-
-    # Format duration as "X hr Y min" or "Y min"
-    minutes = round(duration_seconds / 60)
-    if minutes >= 60:
-        duration_text = f"{minutes // 60} hr {minutes % 60} min"
-    else:
-        duration_text = f"{minutes} min"
-
-    # Format distance as miles
-    miles = distance_meters / 1609.34
-    distance_text = f"{miles:.1f} mi"
-
-    return {
-        "duration_text": duration_text,
-        "duration_seconds": duration_seconds,
-        "distance_text": distance_text,
-        "distance_meters": distance_meters,
-        "destination": settings.commute_destination,
-        "has_traffic_data": True,
-    }
 
 
 @router.delete("/{property_id}")

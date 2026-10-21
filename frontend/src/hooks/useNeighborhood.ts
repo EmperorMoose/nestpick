@@ -11,8 +11,13 @@ export function useNeighborhood(propertyId: number) {
       if ((data as any)?.status === "fetching") return null;
       return data as NeighborhoodData;
     },
-    // Poll every 15s until real data arrives
-    refetchInterval: (query) => (query.state.data === null ? 15_000 : false),
+    // Partial records also need polling while missing ACS economics are refreshed.
+    // Bound retries when an upstream provider remains unavailable.
+    refetchInterval: (query) => (
+      query.state.data !== undefined &&
+      (query.state.data === null || query.state.data.median_income == null) &&
+      query.state.dataUpdateCount < 5 ? 15_000 : false
+    ),
     retry: false,
   });
 }
